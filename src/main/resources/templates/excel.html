@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Excel 미리보기</title>
+    <style>
+        body { font-family: sans-serif; line-height: 1.5; margin: 2rem auto; max-width: 960px; padding: 0 1rem; }
+        h1 { margin-bottom: 1.5rem; }
+        form { align-items: center; display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.5rem; }
+        button { cursor: pointer; padding: .5rem 1rem; }
+        .error { background: #fff0f0; border: 1px solid #d33; color: #a00; margin-bottom: 1rem; padding: .75rem; }
+        .analysis { background: #f5f8ff; border: 1px solid #b7c8ed; margin-bottom: 1.5rem; padding: 1rem; }
+        .analysis dl { display: grid; gap: .5rem 1.5rem; grid-template-columns: max-content 1fr max-content 1fr; margin: 0; }
+        .analysis dt { font-weight: bold; }
+        .analysis dd { margin: 0; }
+        .question-analysis { border-top: 1px solid #ddd; margin-top: 1.5rem; padding-top: 1rem; }
+        .question { border: 1px solid #ccc; margin-bottom: 1rem; padding: 1rem; }
+        .question h3 { margin-top: 0; }
+        .question table { min-width: auto; }
+        .ai-analysis { background: #fffaf0; border: 1px solid #e5c982; margin: 1.5rem 0; padding: 1rem; }
+        .ai-analysis h2 { margin-top: 0; }
+        .ai-analysis h3 { margin-bottom: .25rem; }
+        .ai-analysis ul { margin-top: .25rem; }
+        .table-wrap { overflow-x: auto; }
+        table { border-collapse: collapse; min-width: 100%; }
+        th, td { border: 1px solid #ccc; padding: .6rem .75rem; text-align: left; white-space: nowrap; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+<h1>Excel 파일 미리보기</h1>
+
+<form method="post" enctype="multipart/form-data" th:action="@{/excel}">
+    <input type="file" name="file" accept=".xlsx" required>
+    <button type="submit">업로드</button>
+</form>
+
+<p class="error" th:if="${error}" th:text="${error}"></p>
+
+<section th:if="${preview}">
+    <section class="analysis" th:if="${statistics}">
+        <h2>만족도 통계</h2>
+        <dl>
+            <dt>총 응답 수</dt><dd th:text="${statistics.totalResponses}">0</dd>
+            <dt>유효 만족도 응답 수</dt><dd th:text="${statistics.validSatisfactionResponses}">0</dd>
+            <dt>평균 만족도</dt><dd th:text="${#numbers.formatDecimal(statistics.averageSatisfaction, 1, 2)}">0.00</dd>
+            <dt>최고 만족도</dt><dd th:text="${statistics.maxSatisfaction}">0</dd>
+            <dt>최저 만족도</dt><dd th:text="${statistics.minSatisfaction}">0</dd>
+        </dl>
+    </section>
+    <p class="error" th:if="${analysisMessage}" th:text="${analysisMessage}"></p>
+    <section class="question-analysis" th:if="${questionStatistics != null and !questionStatistics.isEmpty()}">
+        <h2>문항별 분석</h2>
+        <article class="question" th:each="question : ${questionStatistics}">
+            <h3 th:text="${question.question}">문항</h3>
+            <p>
+                유효 응답 수: <strong th:text="${question.validResponses}">0</strong> |
+                평균: <strong th:text="${#numbers.formatDecimal(question.average, 1, 2)}">0.00</strong> |
+                최고점: <strong th:text="${question.max}">0</strong> |
+                최저점: <strong th:text="${question.min}">0</strong>
+            </p>
+            <table>
+                <thead>
+                <tr><th>점수</th><th>응답 수</th><th>응답 비율</th></tr>
+                </thead>
+                <tbody>
+                <tr th:each="score : ${#numbers.sequence(1, 5)}">
+                    <td th:text="${score} + '점'">1점</td>
+                    <td th:text="${question.scoreCounts.get(score)}">0</td>
+                    <td th:text="${question.scoreRatios.get(score)} + '%'">0.00%</td>
+                </tr>
+                </tbody>
+            </table>
+        </article>
+    </section>
+    <section class="analysis" th:if="${mappings != null and !mappings.isEmpty()}">
+        <h2>문항 Mapping</h2>
+        <p th:if="${mappingMessage}" th:text="${mappingMessage}"></p>
+        <form method="post" th:action="@{/excel/mapping}">
+            <table>
+                <thead><tr><th>문항</th><th>예시 응답</th><th>자동 추천</th><th>최종 유형</th><th>상태</th></tr></thead>
+                <tbody>
+                <tr th:each="mapping : ${mappings}">
+                    <td th:text="${mapping.originalHeader}">문항</td>
+                    <td th:text="${mapping.reason}">예시</td>
+                    <td th:text="${mapping.type}">SINGLE</td>
+                    <td>
+                        <select th:name="${'mappingType_' + mapping.columnIndex}">
+                            <option th:each="type : ${T(officeflow.survey.QuestionType).values()}"
+                                    th:value="${type}" th:text="${type}" th:selected="${type == mapping.type}"></option>
+                        </select>
+                    </td>
+                    <td th:text="${mapping.reviewRequired ? '확인필요' : '자동확정'}">자동확정</td>
+                </tr>
+                </tbody>
+            </table>
+            <button type="submit">분석 적용</button>
+        </form>
+    </section>
+    <h2>첫 번째 시트 미리보기</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+            <tr>
+                <th th:each="header : ${preview.headers}" th:text="${header}">컬럼</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="row : ${preview.rows}">
+                <td th:each="value : ${row}" th:text="${value}">값</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</section>
+<section class="ai-analysis" th:if="${aiReady == true or aiAnalysis != null or (aiError != null and !#strings.isEmpty(aiError))}">
+    <h2>AI 종합분석</h2>
+    <form method="post" th:action="@{/excel/ai-analysis}" onsubmit="this.querySelector('button').disabled = true; this.querySelector('button').textContent = '분석 중...';">
+        <button type="submit" th:disabled="${aiReady != true}">AI 종합분석 생성</button>
+    </form>
+    <p class="error" th:if="${aiError != null and !#strings.isEmpty(aiError)}" th:text="${aiError}"></p>
+    <div th:if="${aiAnalysis != null}">
+        <h3>종합평가</h3>
+        <p th:text="${aiAnalysis.overallSummary}"></p>
+        <h3>주요 강점</h3>
+        <ul><li th:each="item : ${aiAnalysis.strengths}" th:text="${item}"></li></ul>
+        <h3>개선점</h3>
+        <ul><li th:each="item : ${aiAnalysis.improvements}" th:text="${item}"></li></ul>
+        <h3>핵심 인사이트</h3>
+        <ul><li th:each="item : ${aiAnalysis.keyInsights}" th:text="${item}"></li></ul>
+        <h3>보고서용 총평</h3>
+        <p th:text="${aiAnalysis.reportParagraph}"></p>
+    </div>
+</section>
+<p th:if="${aiReady == true}">
+    <a th:href="@{/excel/report}">Excel 결과보고서 다운로드</a>
+</p>
+</body>
+</html>
