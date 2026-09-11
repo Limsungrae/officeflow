@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,9 @@ import officeflow.ai.AiSurveyData;
 import officeflow.ai.ExcelAnalysisSessionData;
 import officeflow.excel.QuestionStatisticsDto;
 import officeflow.excel.SatisfactionStatisticsDto;
+import officeflow.survey.SurveyAnalysisResult;
+import officeflow.survey.SurveyQualityResult;
+import officeflow.survey.TextQuestionResult;
 
 class ExcelReportServiceTest {
 
@@ -97,6 +101,22 @@ class ExcelReportServiceTest {
 			String allText = comments.getRow(12).getCell(1).getStringCellValue();
 			assertThat(allText).contains("시설이 좋았습니다").doesNotContain("홍길동");
 			assertThat(workbook.getSheet("07_종합결과").getLastRowNum()).isGreaterThan(8);
+		}
+	}
+
+	@Test
+	void reportsFullTextCountEvenWhenOnlyOneHundredCommentsAreSampled() throws Exception {
+		var sampledComments = IntStream.rangeClosed(1, 100).mapToObj(index -> "의견 " + index).toList();
+		var textResult = new TextQuestionResult("자유의견", 101, 0, sampledComments);
+		var analysis = new SurveyAnalysisResult(101, List.of(), List.of(), List.of(), List.of(), List.of(), List.of(), List.of(),
+				List.of(textResult), new SurveyQualityResult(SurveyQualityResult.QualityStatus.PASS, List.of()));
+		var data = new ExcelAnalysisSessionData(null, List.of(), new AiSurveyData(101, List.of(), sampledComments), null, null, analysis);
+
+		try (XSSFWorkbook workbook = new XSSFWorkbook(new ByteArrayInputStream(service.generate(data)))) {
+			var comments = workbook.getSheet("06_주관식분석");
+			assertThat(comments.getRow(2).getCell(1).getStringCellValue()).isEqualTo("101");
+			assertThat(comments.getRow(3).getCell(1).getStringCellValue()).isEqualTo("101");
+			assertThat(sampledComments).hasSize(100);
 		}
 	}
 
