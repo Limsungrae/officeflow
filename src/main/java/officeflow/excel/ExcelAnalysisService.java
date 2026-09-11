@@ -8,6 +8,8 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
+import officeflow.survey.ScoreValuePolicy;
+
 @Service
 public class ExcelAnalysisService {
 
@@ -22,7 +24,7 @@ public class ExcelAnalysisService {
 		List<BigDecimal> validValues = new ArrayList<>();
 		for (List<String> row : preview.allDataRows()) {
 			if (satisfactionColumn < row.size()) {
-				parseNumber(row.get(satisfactionColumn)).ifPresent(validValues::add);
+				ScoreValuePolicy.parseFivePoint(row.get(satisfactionColumn)).ifPresent(validValues::add);
 			}
 		}
 
@@ -37,17 +39,5 @@ public class ExcelAnalysisService {
 				average,
 				validValues.stream().max(BigDecimal::compareTo).orElse(BigDecimal.ZERO),
 				validValues.stream().min(BigDecimal::compareTo).orElse(BigDecimal.ZERO)));
-	}
-
-	private Optional<BigDecimal> parseNumber(String value) {
-		if (value == null || value.isBlank()) {
-			return Optional.empty();
-		}
-
-		try {
-			return Optional.of(new BigDecimal(value.trim().replace(",", "")));
-		} catch (NumberFormatException exception) {
-			return Optional.empty();
-		}
 	}
 }
