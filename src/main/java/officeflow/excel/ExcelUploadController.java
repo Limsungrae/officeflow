@@ -72,9 +72,8 @@ public class ExcelUploadController {
 			var workspaceAnalysis = surveyWorkspaceService.create(preview);
 			var sessionData = createSessionData(workspaceAnalysis);
 			storeSessionData(session, sessionData);
-
 		} catch (IllegalArgumentException | IOException exception) {
-			session.removeAttribute(ANALYSIS_SESSION_KEY);
+			// Failed uploads are atomic: keep any previously valid analysis snapshot.
 			model.addAttribute("error", exception.getMessage());
 		}
 		populateModelFromSession(model, session);
@@ -94,7 +93,6 @@ public class ExcelUploadController {
 			var surveyData = aiSurveyAnalysisService.createSurveyData(sessionData.surveyAnalysis(), sessionData.questionStatistics());
 			AiAnalysisResultDto result = aiSurveyAnalysisService.analyze(surveyData);
 			synchronized (session) {
-				// A response for an older mapping must not overwrite a newer session snapshot.
 				if (getSessionData(session) != sessionData) {
 					throw new AiAnalysisException("분석 데이터가 변경되었습니다. AI 분석을 다시 실행해주세요.");
 				}
@@ -135,7 +133,6 @@ public class ExcelUploadController {
 		var preview = new ExcelParserService.ExcelPreview(current.surveyWorkspace().headers(),
 				List.of(), current.surveyWorkspace().originalRows());
 		var updated = surveyWorkspaceService.create(preview, mappings);
-		// Every mapping submit starts a new analysis snapshot, including identical submissions.
 		ExcelAnalysisSessionData replaced = createSessionData(updated);
 		storeSessionData(session, replaced);
 		model.addAttribute("mappingMessage", "문항 매핑을 적용했습니다.");
@@ -194,7 +191,6 @@ public class ExcelUploadController {
 	}
 
 	private void populateModelFromSession(Model model, HttpSession session) {
-		// Optional state must disappear when the current session no longer contains it.
 		for (String attribute : List.of("preview", "headers", "rowCount", "workspace", "mappings",
 				"statistics", "satisfactionStatistics", "questionStatistics", "mappingResult", "surveyAnalysis",
 				"surveyData", "aiAnalysis", "aiReady", "analysisMessage")) {
@@ -226,5 +222,4 @@ public class ExcelUploadController {
 					workspace.originalRows().stream().limit(10).toList(), workspace.originalRows()));
 		}
 	}
-
 }
