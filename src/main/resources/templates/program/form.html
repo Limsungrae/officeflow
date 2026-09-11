@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title th:text="${formTitle + ' | OfficeFlow'}">프로그램 | OfficeFlow</title>
+    <style>
+        body{font-family:"Pretendard","Noto Sans KR",Arial,sans-serif;margin:0;background:#f5f7fb;color:#1f2937}.wrap{max-width:760px;margin:48px auto;padding:0 24px}
+        .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;box-shadow:0 6px 20px rgba(15,23,42,.04)}h1{margin-top:0}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.full{grid-column:1/-1}
+        label{display:block;font-size:13px;font-weight:700;margin-bottom:7px;color:#475569}input,select{width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid #cbd5e1;border-radius:9px;background:white;font-size:14px}
+        .error{color:#b91c1c;font-size:12px;margin-top:6px}.global{padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;color:#b91c1c;margin-bottom:18px}.actions{display:flex;justify-content:flex-end;gap:10px;margin-top:24px}.btn{padding:11px 16px;border-radius:9px;text-decoration:none;border:0;font-weight:700;cursor:pointer}.primary{background:#1f4e78;color:white}.secondary{background:#fff;color:#334155;border:1px solid #cbd5e1}
+    </style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+    <h1 th:text="${formTitle}">프로그램 등록</h1>
+    <form th:action="${formAction}" th:object="${programForm}" method="post">
+        <div class="global" th:if="${#fields.hasGlobalErrors()}" th:each="err : ${#fields.globalErrors()}" th:text="${err}">오류</div>
+        <div class="grid">
+            <div class="full"><label>프로그램명 *</label><input type="text" th:field="*{title}" placeholder="예: 2026 길 위의 인문학"><div class="error" th:errors="*{title}"></div></div>
+            <div><label>시작일 *</label><input type="date" th:field="*{startDate}"><div class="error" th:errors="*{startDate}"></div></div>
+            <div><label>종료일 *</label><input type="date" th:field="*{endDate}"><div class="error" th:errors="*{endDate}"></div></div>
+            <div><label>대상</label><input type="text" th:field="*{targetGroup}" placeholder="예: 성남시민 20명"><div class="error" th:errors="*{targetGroup}"></div></div>
+            <div><label>정원</label><input type="number" min="1" th:field="*{capacity}" placeholder="20"><div class="error" th:errors="*{capacity}"></div></div>
+            <div><label>담당자</label><input type="text" th:field="*{manager}" placeholder="담당자명"><div class="error" th:errors="*{manager}"></div></div>
+            <div><label>상태 *</label><select th:field="*{status}"><option th:each="status : ${statuses}" th:value="${status}" th:text="${status.label()}">상태</option></select><div class="error" th:errors="*{status}"></div></div>
+        </div>
+        <div class="actions"><a class="btn secondary" href="/programs">취소</a><button class="btn primary" type="submit">저장</button></div>
+    </form>
+</div></div>
+</body>
+</html>
