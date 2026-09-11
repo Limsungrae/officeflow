@@ -22,6 +22,8 @@ OfficeFlow는 **Excel 설문 응답 파일을 업로드해 문항을 자동 분�
 - 7개 시트 Excel 결과보고서 다운로드
 - 세션 기반 분석 상태 유지
 - 잘못된 매핑·손상된 Excel 입력에 대한 방어 처리
+- H2 + Spring Data JPA 기반 영속화 기반
+- 도서관 프로그램 `Program` 도메인 및 Repository
 
 ## 핵심 데이터 흐름
 
@@ -40,6 +42,8 @@ OfficeFlow는 **Excel 설문 응답 파일을 업로드해 문항을 자동 분�
 ```
 
 원본 응답은 재매핑 과정에서도 변경하지 않으며, **최종 문항 매핑을 모든 파생 분석의 기준으로 사용**합니다.
+
+현재 설문 분석 작업 상태는 `HttpSession`에 유지하고, 프로그램 메타데이터 영속화를 위한 H2/JPA 기반을 별도로 추가했습니다.
 
 ## 안정화된 주요 동작
 
@@ -62,13 +66,60 @@ OfficeFlow는 **Excel 설문 응답 파일을 업로드해 문항을 자동 분�
 - Spring Boot 4.1.1
 - Spring MVC
 - Thymeleaf
+- Spring Data JPA
+- Hibernate
+- H2 Database
 - Apache POI 5.4.1
 - Jackson
 - Gemini API
 - Gradle 9.x Wrapper
 - JUnit 5 / AssertJ
 
-현재 버전은 별도 DB 없이 `HttpSession`을 사용해 분석 상태를 관리합니다.
+## 영속화 기반
+
+### H2
+
+개발 환경에서는 별도 DB 서버 설치 없이 파일 기반 H2를 사용합니다.
+
+```properties
+spring.datasource.url=jdbc:h2:file:./data/officeflow;DB_CLOSE_ON_EXIT=FALSE
+spring.datasource.username=sa
+spring.jpa.hibernate.ddl-auto=update
+```
+
+DB 파일은 프로젝트의 `data/` 디렉터리에 생성되며 Git에는 포함하지 않습니다.
+
+### Program 도메인
+
+첫 번째 영속 도메인은 도서관 프로그램입니다.
+
+```text
+Program
+- id
+- title
+- startDate
+- endDate
+- target
+- capacity
+- manager
+- status
+- createdAt
+- updatedAt
+```
+
+상태 값:
+
+```text
+PLANNED
+OPEN
+IN_PROGRESS
+COMPLETED
+CANCELLED
+```
+
+`ProgramRepository`는 Spring Data JPA의 `JpaRepository`를 사용합니다.
+
+현재 단계에서는 **Program Entity/Repository와 DB 저장 기반까지만 구현**했으며, 프로그램 등록 화면과 설문 분석 이력 연결은 다음 확장 단계입니다.
 
 ## 프로젝트 구조
 
@@ -76,6 +127,7 @@ OfficeFlow는 **Excel 설문 응답 파일을 업로드해 문항을 자동 분�
 src/main/java/officeflow
 ├─ ai/       # Gemini 연동, AI 입력/결과 DTO
 ├─ excel/    # 업로드, 파싱, 기존 통계, 컨트롤러
+├─ program/  # Program JPA Entity, 상태, Repository
 ├─ report/   # Excel 결과보고서 생성
 └─ survey/   # 문항 프로파일링, 매핑, 유형별 설문 분석
 
@@ -111,6 +163,8 @@ gradlew.bat bootRun
 http://localhost:8080/excel
 ```
 
+애플리케이션 최초 실행 시 H2 DB 파일과 JPA 테이블이 자동으로 준비됩니다.
+
 ## Gemini 설정
 
 AI 분석을 사용하려면 환경변수에 API Key를 설정합니다.
@@ -126,7 +180,7 @@ Windows PowerShell:
 
 ```powershell
 $env:GEMINI_API_KEY="your-api-key"
-./gradlew bootRun
+gradlew.bat bootRun
 ```
 
 선택적으로 다음 환경변수도 변경할 수 있습니다.
@@ -152,6 +206,8 @@ AI 기능을 사용하지 않는 경우에도 Excel 업로드, 문항 분석, �
 ./gradlew bootJar
 ```
 
+JPA Repository 테스트에서는 Spring Boot의 `@DataJpaTest`와 임베디드 H2를 사용해 Program 저장/조회와 기본 도메인 제약을 검증합니다.
+
 생성 JAR:
 
 ```text
@@ -175,8 +231,6 @@ java -jar build/libs/officeflow-0.0.1-SNAPSHOT.jar
 ### 5점 척도
 
 `SCALE` 및 기존 만족도 통계는 `1, 2, 3, 4, 5` 정수만 정상 응답으로 처리합니다.
-
-예:
 
 ```text
 4, 4, 4, 4, 99
@@ -216,14 +270,21 @@ OfficeFlow는 이름, 연락처, 이메일 등 명백한 식별 가능 컬럼을
 
 ## 현재 범위
 
-현재 버전은 단일 Spring Boot 애플리케이션 기반의 설문 분석 프로토타입/업무지원 도구입니다.
+현재 버전은 단일 Spring Boot 애플리케이션 기반의 설문 분석 및 도서관 프로그램 성과관리 플랫폼으로 확장 중입니다.
 
-아직 포함하지 않은 기능:
+현재 구현:
 
-- DB 영구 저장
+- 안정화된 Excel 설문 분석 엔진
+- AI 설문 해석
+- Excel 결과보고서
+- H2 + JPA 영속화 기반
+- Program Entity / Repository
+
+다음 확장 대상:
+
+- 프로그램 등록/수정/목록 화면
+- Program과 설문 분석 이력 연결
+- 설문 분석 결과 DB 저장
+- 프로그램별 성과 조회
 - 사용자 로그인 / 권한 관리
-- 다중 사용자 협업
-- 설문 프로젝트 이력 관리
 - 운영 환경용 감사 로그
-
-이 기능들은 핵심 분석 흐름 안정화 이후 확장 대상으로 두고 있습니다.
