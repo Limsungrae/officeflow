@@ -30,6 +30,27 @@ class ExcelAnalysisServiceTest {
 	}
 
 	@Test
+	void excludesOutOfRangeAndDecimalValuesFromFivePointSatisfaction() {
+		var preview = preview(
+				List.of("만족도"),
+				List.of(
+						List.of("4"),
+						List.of("4"),
+						List.of("4"),
+						List.of("4"),
+						List.of("99"),
+						List.of("4.5")));
+
+		var result = service.analyze(preview).orElseThrow();
+
+		assertThat(result.totalResponses()).isEqualTo(6);
+		assertThat(result.validSatisfactionResponses()).isEqualTo(4);
+		assertThat(result.averageSatisfaction()).isEqualByComparingTo("4.00");
+		assertThat(result.maxSatisfaction()).isEqualByComparingTo("4");
+		assertThat(result.minSatisfaction()).isEqualByComparingTo("4");
+	}
+
+	@Test
 	void reportsMissingSatisfactionHeader() {
 		assertThat(service.analyze(preview(
 				List.of("의견"), List.of(List.of("좋아요"))))).isEmpty();

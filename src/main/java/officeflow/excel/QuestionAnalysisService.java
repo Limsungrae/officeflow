@@ -7,16 +7,15 @@ import java.util.Locale;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.stereotype.Service;
+
+import officeflow.survey.ScoreValuePolicy;
 
 @Service
 public class QuestionAnalysisService {
 
 	private static final int MINIMUM_VALID_VALUES = 3;
-	private static final BigDecimal MINIMUM_SCORE = BigDecimal.ONE;
-	private static final BigDecimal MAXIMUM_SCORE = BigDecimal.valueOf(5);
 	private static final BigDecimal MINIMUM_SCORE_RATIO = BigDecimal.valueOf(0.8);
 	private static final List<String> NON_QUESTION_HEADER_TOKENS = List.of(
 			"id", "번호", "no", "code", "코드");
@@ -47,12 +46,7 @@ public class QuestionAnalysisService {
 			if (columnIndex >= row.size()) {
 				continue;
 			}
-
-			parseNumber(row.get(columnIndex)).ifPresent(value -> {
-				if (isScore(value)) {
-					scores.add(value);
-				}
-			});
+			ScoreValuePolicy.parseFivePoint(row.get(columnIndex)).ifPresent(scores::add);
 		}
 		return scores;
 	}
@@ -98,22 +92,5 @@ public class QuestionAnalysisService {
 				scores.stream().min(BigDecimal::compareTo).orElseThrow().intValue(),
 				scoreCounts,
 				scoreRatios);
-	}
-
-	private boolean isScore(BigDecimal value) {
-		return value.remainder(BigDecimal.ONE).compareTo(BigDecimal.ZERO) == 0
-				&& value.compareTo(MINIMUM_SCORE) >= 0
-				&& value.compareTo(MAXIMUM_SCORE) <= 0;
-	}
-
-	private Optional<BigDecimal> parseNumber(String value) {
-		if (value == null || value.isBlank()) {
-			return Optional.empty();
-		}
-		try {
-			return Optional.of(new BigDecimal(value.trim().replace(",", "")));
-		} catch (NumberFormatException exception) {
-			return Optional.empty();
-		}
 	}
 }

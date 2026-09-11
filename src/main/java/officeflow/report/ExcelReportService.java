@@ -233,8 +233,11 @@ public class ExcelReportService {
 		Sheet sheet = setup(workbook, 5, PrintOrientation.PORTRAIT);
 		title(sheet, styles, "Ⅵ. 주관식분석", 6);
 		List<String> comments = data.surveyData() == null ? List.of() : data.surveyData().freeComments();
-		row(sheet, 2, "전체 자유의견", String.valueOf(comments.size()), styles.kpi);
-		row(sheet, 3, "분석 가능 의견", String.valueOf(comments.size()), styles.kpi);
+		int totalValidComments = data.surveyAnalysis() == null
+				? comments.size()
+				: data.surveyAnalysis().textQuestions().stream().mapToInt(result -> result.validCount()).sum();
+		row(sheet, 2, "전체 자유의견", String.valueOf(totalValidComments), styles.kpi);
+		row(sheet, 3, "분석 가능 의견", String.valueOf(totalValidComments), styles.kpi);
 		row(sheet, 4, "비식별 처리", "완료", styles.kpi);
 		row(sheet, 5, "개인정보 포함 여부", "없음", styles.kpi);
 		AiAnalysisResultDto ai = data.aiAnalysis();

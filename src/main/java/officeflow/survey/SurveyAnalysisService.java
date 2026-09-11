@@ -10,6 +10,10 @@ import org.springframework.stereotype.Service;
 @Service
 public class SurveyAnalysisService {
 
+	private static final int MAX_TEXT_SAMPLE_COUNT = 100;
+	private static final int MAX_TEXT_SAMPLE_LENGTH = 1000;
+	private static final List<String> EMPTY_TEXT_RESPONSES = List.of("없음", "없습니다", "-", "무응답");
+
 	private final MultipleChoiceParser multipleChoiceParser;
 	private final SurveyQualityValidationService qualityValidationService;
 
@@ -77,10 +81,12 @@ public class SurveyAnalysisService {
 		for (String value : values) {
 			if (value.isBlank()) { missing++; continue; }
 			raw.merge(value, 1, Integer::sum);
-			Double score = mapping.scoreMap().get(value);
-			if (score == null) {
-				try { score = Double.valueOf(value); } catch (NumberFormatException exception) { unmapped.add(value); continue; }
+			var parsedScore = ScoreValuePolicy.parseForMapping(mapping, value);
+			if (parsedScore.isEmpty()) {
+				unmapped.add(value);
+				continue;
 			}
+			double score = parsedScore.get();
 			valid++; sum += score; min = Math.min(min, score); max = Math.max(max, score); scoreCounts.merge(score, 1, Integer::sum);
 		}
 		Double average = valid == 0 ? null : sum / valid;
@@ -89,8 +95,19 @@ public class SurveyAnalysisService {
 	}
 
 	private TextQuestionResult text(String question, List<String> values) {
-		List<String> comments = values.stream().filter(value -> !value.isBlank() && !List.of("없음", "없습니다", "-", "무응답").contains(value.trim())).limit(100).map(value -> value.trim().substring(0, Math.min(1000, value.trim().length()))).toList();
-		return new TextQuestionResult(question, comments.size(), values.size() - comments.size(), comments);
+		List<String> validComments = values.stream()
+				.filter(this::isMeaningfulComment)
+				.map(String::trim)
+				.toList();
+		List<String> sampleComments = validComments.stream()
+				.limit(MAX_TEXT_SAMPLE_COUNT)
+				.map(value -> value.substring(0, Math.min(MAX_TEXT_SAMPLE_LENGTH, value.length())))
+				.toList();
+		return new TextQuestionResult(question, validComments.size(), values.size() - validComments.size(), sampleComments);
+	}
+
+	private boolean isMeaningfulComment(String value) {
+		return value != null && !value.isBlank() && !EMPTY_TEXT_RESPONSES.contains(value.trim());
 	}
 
 	private List<String> values(SurveyAnalysisWorkspace workspace, int columnIndex) { return workspace.originalRows().stream().map(row -> columnIndex < row.size() ? row.get(columnIndex) : "").toList(); }
