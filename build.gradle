@@ -26,6 +26,7 @@ dependencies {
     implementation 'org.apache.poi:poi-ooxml:5.4.1'
 
     runtimeOnly 'com.h2database:h2'
+    developmentOnly 'org.springframework.boot:spring-boot-h2console'
 
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
