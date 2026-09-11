@@ -15,6 +15,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import officeflow.excel.ExcelParserService;
 import officeflow.excel.QuestionStatisticsDto;
 import officeflow.excel.SatisfactionStatisticsDto;
+import officeflow.survey.SurveyAnalysisResult;
 
 @Service
 public class AiSurveyAnalysisService {
@@ -54,6 +55,15 @@ public class AiSurveyAnalysisService {
 				totalResponses,
 				List.copyOf(questionStatistics),
 				collectFreeComments(preview));
+	}
+
+	/** Use final typed results, never infer question types again from headers or numeric text. */
+	public AiSurveyData createSurveyData(SurveyAnalysisResult analysis, List<QuestionStatisticsDto> questionStatistics) {
+		List<String> comments = analysis.textQuestions().stream().flatMap(question -> question.comments().stream())
+				.limit(MAX_COMMENT_COUNT).toList();
+		return new AiSurveyData(analysis.respondentCount(), List.copyOf(questionStatistics), comments,
+				analysis.respondentAttributes(), analysis.singleQuestions(), analysis.multipleQuestions(),
+				analysis.scaleQuestions(), analysis.scoreQuestions(), analysis.recommendationQuestions(), analysis.textQuestions());
 	}
 
 	public AiAnalysisResultDto analyze(AiSurveyData surveyData) {

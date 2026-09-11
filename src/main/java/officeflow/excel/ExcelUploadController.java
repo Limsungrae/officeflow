@@ -27,7 +27,6 @@ import officeflow.ai.AiAnalysisResultDto;
 import officeflow.ai.AiSurveyAnalysisService;
 import officeflow.ai.ExcelAnalysisSessionData;
 import officeflow.report.ExcelReportService;
-import officeflow.survey.QuestionRole;
 import officeflow.survey.QuestionType;
 import officeflow.survey.QuestionMappingDto;
 import officeflow.survey.SurveyWorkspaceService;
@@ -62,10 +61,7 @@ public class ExcelUploadController {
 		if (error != null && !error.isBlank()) {
 			model.addAttribute("error", error);
 		}
-		ExcelAnalysisSessionData sessionData = getSessionData(session);
-		if (sessionData != null) {
-			addAnalysisModel(model, sessionData);
-		}
+		populateModelFromSession(model, session);
 		return "excel";
 	}
 
@@ -73,23 +69,15 @@ public class ExcelUploadController {
 	public String upload(@RequestParam("file") MultipartFile file, Model model, HttpSession session) {
 		try {
 			var preview = excelParserService.parse(file);
-			var questionStatistics = questionAnalysisService.analyze(preview);
-			var statistics = excelAnalysisService.analyze(preview).orElse(null);
-			var surveyData = aiSurveyAnalysisService.createSurveyData(statistics, questionStatistics, preview);
 			var workspaceAnalysis = surveyWorkspaceService.create(preview);
-			session.setAttribute(ANALYSIS_SESSION_KEY,
-					new ExcelAnalysisSessionData(statistics, questionStatistics, surveyData, null,
-							workspaceAnalysis.workspace(), workspaceAnalysis.result()));
-			model.addAttribute("preview", preview);
-			addAnalysisModel(model, new ExcelAnalysisSessionData(statistics, questionStatistics, surveyData, null,
-					workspaceAnalysis.workspace(), workspaceAnalysis.result()));
-			if (statistics == null) {
-				model.addAttribute("analysisMessage", "만족도 컬럼을 찾을 수 없습니다.");
-			}
+			var sessionData = createSessionData(workspaceAnalysis);
+			storeSessionData(session, sessionData);
+
 		} catch (IllegalArgumentException | IOException exception) {
 			session.removeAttribute(ANALYSIS_SESSION_KEY);
 			model.addAttribute("error", exception.getMessage());
 		}
+		populateModelFromSession(model, session);
 		return "excel";
 	}
 
@@ -98,20 +86,26 @@ public class ExcelUploadController {
 		ExcelAnalysisSessionData sessionData = getSessionData(session);
 		if (sessionData == null) {
 			model.addAttribute("aiError", "먼저 Excel 파일을 업로드해주세요.");
+			populateModelFromSession(model, session);
 			return "excel";
 		}
 
-		addAnalysisModel(model, sessionData);
 		try {
-			AiAnalysisResultDto result = aiSurveyAnalysisService.analyze(sessionData.surveyData());
-			sessionData = new ExcelAnalysisSessionData(sessionData.satisfactionStatistics(),
-					sessionData.questionStatistics(), sessionData.surveyData(), result,
-				sessionData.surveyWorkspace(), sessionData.surveyAnalysis());
-			session.setAttribute(ANALYSIS_SESSION_KEY, sessionData);
-			model.addAttribute("aiAnalysis", result);
+			var surveyData = aiSurveyAnalysisService.createSurveyData(sessionData.surveyAnalysis(), sessionData.questionStatistics());
+			AiAnalysisResultDto result = aiSurveyAnalysisService.analyze(surveyData);
+			synchronized (session) {
+				// A response for an older mapping must not overwrite a newer session snapshot.
+				if (getSessionData(session) != sessionData) {
+					throw new AiAnalysisException("분석 데이터가 변경되었습니다. AI 분석을 다시 실행해주세요.");
+				}
+				storeSessionData(session, new ExcelAnalysisSessionData(sessionData.satisfactionStatistics(),
+						sessionData.questionStatistics(), surveyData, result,
+						sessionData.surveyWorkspace(), sessionData.surveyAnalysis()));
+			}
 		} catch (AiAnalysisException exception) {
 			model.addAttribute("aiError", exception.getMessage());
 		}
+		populateModelFromSession(model, session);
 		return "excel";
 	}
 
@@ -120,21 +114,22 @@ public class ExcelUploadController {
 		ExcelAnalysisSessionData current = getSessionData(session);
 		if (current == null || current.surveyWorkspace() == null) {
 			model.addAttribute("error", "먼저 Excel 파일을 분석해주세요.");
+			populateModelFromSession(model, session);
 			return "excel";
 		}
 		List<QuestionMappingDto> mappings = new java.util.ArrayList<>();
 		for (QuestionMappingDto mapping : current.surveyWorkspace().mappings()) {
 			String selected = parameters.get("mappingType_" + mapping.columnIndex());
-			mappings.add(selected == null ? mapping : mapping.withType(QuestionType.valueOf(selected), roleFor(QuestionType.valueOf(selected))));
+			mappings.add(selected == null ? mapping : mapping.withType(QuestionType.valueOf(selected)));
 		}
 		var preview = new ExcelParserService.ExcelPreview(current.surveyWorkspace().headers(),
-				List.of(), current.surveyWorkspace().sanitizedRows());
+				List.of(), current.surveyWorkspace().originalRows());
 		var updated = surveyWorkspaceService.create(preview, mappings);
-		ExcelAnalysisSessionData replaced = new ExcelAnalysisSessionData(current.satisfactionStatistics(),
-				current.questionStatistics(), current.surveyData(), current.aiAnalysis(), updated.workspace(), updated.result());
-		session.setAttribute(ANALYSIS_SESSION_KEY, replaced);
-		addAnalysisModel(model, replaced);
+		// Every mapping submit starts a new analysis snapshot, including identical submissions.
+		ExcelAnalysisSessionData replaced = createSessionData(updated);
+		storeSessionData(session, replaced);
 		model.addAttribute("mappingMessage", "문항 매핑을 적용했습니다.");
+		populateModelFromSession(model, session);
 		return "excel";
 	}
 
@@ -159,25 +154,56 @@ public class ExcelUploadController {
 		}
 	}
 
+	private ExcelAnalysisSessionData createSessionData(SurveyWorkspaceService.WorkspaceAnalysis analysis) {
+		var scorePreview = analysis.workspace().scorePreview();
+		var questionStatistics = questionAnalysisService.analyze(scorePreview);
+		var statistics = excelAnalysisService.analyze(scorePreview).orElse(null);
+		var surveyData = aiSurveyAnalysisService.createSurveyData(analysis.result(), questionStatistics);
+		return new ExcelAnalysisSessionData(statistics, questionStatistics, surveyData, null, analysis.workspace(), analysis.result());
+	}
+
+	private void storeSessionData(HttpSession session, ExcelAnalysisSessionData data) {
+		synchronized (session) {
+			session.setAttribute(ANALYSIS_SESSION_KEY, data);
+		}
+	}
+
 	private ExcelAnalysisSessionData getSessionData(HttpSession session) {
 		return (ExcelAnalysisSessionData) session.getAttribute(ANALYSIS_SESSION_KEY);
 	}
 
-	private void addAnalysisModel(Model model, ExcelAnalysisSessionData sessionData) {
-		if (sessionData.satisfactionStatistics() != null) {
-			model.addAttribute("statistics", sessionData.satisfactionStatistics());
+	private void populateModelFromSession(Model model, HttpSession session) {
+		// Optional state must disappear when the current session no longer contains it.
+		for (String attribute : List.of("preview", "headers", "rowCount", "workspace", "mappings",
+				"statistics", "satisfactionStatistics", "questionStatistics", "mappingResult", "surveyAnalysis",
+				"surveyData", "aiAnalysis", "aiReady", "analysisMessage")) {
+			model.asMap().remove(attribute);
 		}
-		model.addAttribute("questionStatistics", sessionData.questionStatistics());
+		ExcelAnalysisSessionData data = getSessionData(session);
+		if (data == null) return;
+
+		if (data.satisfactionStatistics() != null) {
+			model.addAttribute("statistics", data.satisfactionStatistics());
+			model.addAttribute("satisfactionStatistics", data.satisfactionStatistics());
+		} else {
+			model.addAttribute("analysisMessage", "만족도 컬럼을 찾을 수 없습니다.");
+		}
+		model.addAttribute("questionStatistics", data.questionStatistics());
+		model.addAttribute("surveyAnalysis", data.surveyAnalysis());
+		model.addAttribute("mappingResult", data.surveyAnalysis());
+		model.addAttribute("surveyData", data.surveyData());
 		model.addAttribute("aiReady", true);
-		model.addAttribute("mappingResult", sessionData.surveyAnalysis());
-		model.addAttribute("mappings", sessionData.surveyWorkspace() == null ? List.of() : sessionData.surveyWorkspace().mappings());
+		if (data.aiAnalysis() != null) model.addAttribute("aiAnalysis", data.aiAnalysis());
+
+		var workspace = data.surveyWorkspace();
+		model.addAttribute("mappings", workspace == null ? List.of() : workspace.mappings());
+		if (workspace != null) {
+			model.addAttribute("workspace", workspace);
+			model.addAttribute("headers", workspace.headers());
+			model.addAttribute("rowCount", workspace.respondentCount());
+			model.addAttribute("preview", new ExcelParserService.ExcelPreview(workspace.headers(),
+					workspace.originalRows().stream().limit(10).toList(), workspace.originalRows()));
+		}
 	}
 
-	private QuestionRole roleFor(QuestionType type) {
-		return switch (type) {
-		case SINGLE -> QuestionRole.SURVEY;
-		case MULTIPLE, SCALE, SCORE, RECOMMENDATION, TEXT -> QuestionRole.SURVEY;
-		default -> QuestionRole.EXCLUDED;
-		};
-	}
 }

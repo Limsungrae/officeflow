@@ -27,7 +27,7 @@ public class SurveyAnalysisService {
 		List<ScoreQuestionResult> recommendations = new ArrayList<>();
 		List<TextQuestionResult> texts = new ArrayList<>();
 		for (QuestionMappingDto mapping : workspace.mappings()) {
-			if (!mapping.analysisTarget()) continue;
+			if (!mapping.includedInAnalysis()) continue;
 			List<String> values = values(workspace, mapping.columnIndex());
 			switch (mapping.type()) {
 			case SINGLE -> {
@@ -93,6 +93,6 @@ public class SurveyAnalysisService {
 		return new TextQuestionResult(question, comments.size(), values.size() - comments.size(), comments);
 	}
 
-	private List<String> values(SurveyAnalysisWorkspace workspace, int columnIndex) { return workspace.sanitizedRows().stream().map(row -> columnIndex < row.size() ? row.get(columnIndex) : "").toList(); }
+	private List<String> values(SurveyAnalysisWorkspace workspace, int columnIndex) { return workspace.originalRows().stream().map(row -> columnIndex < row.size() ? row.get(columnIndex) : "").toList(); }
 	private double ratio(int numerator, int denominator) { return denominator == 0 ? 0 : (double) numerator / denominator * 100; }
 }

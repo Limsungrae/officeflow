@@ -19,6 +19,21 @@ public record QuestionMappingDto(
 		Double scaleMax,
 		List<String> multipleChoices) {
 
+	public boolean includedInAnalysis() {
+		return analysisTarget && role != QuestionRole.IDENTIFIER && role != QuestionRole.METADATA
+				&& role != QuestionRole.EXCLUDED;
+	}
+
+	/** Type-only UI edits retain semantic roles; UNKNOWN disables analysis without losing the role. */
+	public QuestionMappingDto withType(QuestionType newType) {
+		QuestionRole retainedRole = role == QuestionRole.EXCLUDED && newType != QuestionType.UNKNOWN
+				? QuestionRole.SURVEY : role;
+		return new QuestionMappingDto(columnIndex, columnNumber, originalHeader, normalizedHeader,
+				newType, retainedRole, newType != QuestionType.UNKNOWN && retainedRole != QuestionRole.EXCLUDED
+						&& retainedRole != QuestionRole.IDENTIFIER && retainedRole != QuestionRole.METADATA,
+				0.5, true, "사용자 수정", scoreMap, scaleMin, scaleMax, multipleChoices);
+	}
+
 	public QuestionMappingDto withType(QuestionType newType, QuestionRole newRole) {
 		return new QuestionMappingDto(columnIndex, columnNumber, originalHeader, normalizedHeader,
 				newType, newRole, newRole != QuestionRole.EXCLUDED && newRole != QuestionRole.IDENTIFIER

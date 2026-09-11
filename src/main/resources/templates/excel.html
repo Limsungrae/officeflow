@@ -38,8 +38,7 @@
 
 <p class="error" th:if="${error}" th:text="${error}"></p>
 
-<section th:if="${preview}">
-    <section class="analysis" th:if="${statistics}">
+    <section id="statistics" class="analysis" th:if="${statistics != null}">
         <h2>만족도 통계</h2>
         <dl>
             <dt>총 응답 수</dt><dd th:text="${statistics.totalResponses}">0</dd>
@@ -50,7 +49,7 @@
         </dl>
     </section>
     <p class="error" th:if="${analysisMessage}" th:text="${analysisMessage}"></p>
-    <section class="question-analysis" th:if="${questionStatistics != null and !questionStatistics.isEmpty()}">
+    <section id="question-statistics" class="question-analysis" th:if="${questionStatistics != null and !questionStatistics.isEmpty()}">
         <h2>문항별 분석</h2>
         <article class="question" th:each="question : ${questionStatistics}">
             <h3 th:text="${question.question}">문항</h3>
@@ -74,7 +73,7 @@
             </table>
         </article>
     </section>
-    <section class="analysis" th:if="${mappings != null and !mappings.isEmpty()}">
+    <section id="mappings" class="analysis" th:if="${mappings != null and !mappings.isEmpty()}">
         <h2>문항 Mapping</h2>
         <p th:if="${mappingMessage}" th:text="${mappingMessage}"></p>
         <form method="post" th:action="@{/excel/mapping}">
@@ -98,7 +97,36 @@
             <button type="submit">분석 적용</button>
         </form>
     </section>
+<section id="survey-analysis" class="analysis" th:if="${surveyAnalysis != null}">
+    <h2>최종 문항 분석</h2>
+    <p>총 응답 수: <strong th:text="${surveyAnalysis.respondentCount}">0</strong></p>
+    <th:block th:each="questions : ${ {surveyAnalysis.respondentAttributes, surveyAnalysis.singleQuestions} }">
+        <article class="question" th:each="question : ${questions}">
+            <h3 th:text="${question.question}">문항</h3>
+            <p>유효응답: <span th:text="${question.validCount}"></span> / 무응답: <span th:text="${question.missingCount}"></span></p>
+            <ul><li th:each="item : ${question.items}"><span th:text="${item.label}"></span>: <span th:text="${item.count}"></span>명</li></ul>
+        </article>
+    </th:block>
+    <article class="question" th:each="question : ${surveyAnalysis.multipleQuestions}">
+        <h3 th:text="${question.question}">복수응답 문항</h3>
+        <p>유효응답: <span th:text="${question.validRespondents}"></span> / 총 선택 수: <span th:text="${question.totalSelections}"></span></p>
+        <ul><li th:each="item : ${question.items}"><span th:text="${item.label}"></span>: <span th:text="${item.count}"></span>건</li></ul>
+    </article>
+    <th:block th:each="questions : ${ {surveyAnalysis.scaleQuestions, surveyAnalysis.scoreQuestions, surveyAnalysis.recommendationQuestions} }">
+        <article class="question" th:each="question : ${questions}">
+            <h3 th:text="${question.question}">점수 문항</h3>
+            <p>유효응답: <span th:text="${question.validCount}"></span> / 평균: <span th:text="${question.average == null ? '-' : #numbers.formatDecimal(question.average, 1, 2)}"></span></p>
+        </article>
+    </th:block>
+    <article class="question" th:each="question : ${surveyAnalysis.textQuestions}">
+        <h3 th:text="${question.question}">주관식 문항</h3>
+        <p>유효응답: <span th:text="${question.validCount}"></span> / 무응답: <span th:text="${question.missingCount}"></span></p>
+        <ul><li th:each="comment : ${question.comments}" th:text="${comment}"></li></ul>
+    </article>
+</section>
+<section id="preview" th:if="${preview != null}">
     <h2>첫 번째 시트 미리보기</h2>
+    <p>전체 응답 수: <span th:text="${rowCount}">0</span> · 최대 10행 표시</p>
     <div class="table-wrap">
         <table>
             <thead>
@@ -120,7 +148,7 @@
         <button type="submit" th:disabled="${aiReady != true}">AI 종합분석 생성</button>
     </form>
     <p class="error" th:if="${aiError != null and !#strings.isEmpty(aiError)}" th:text="${aiError}"></p>
-    <div th:if="${aiAnalysis != null}">
+    <div id="ai-result" th:if="${aiAnalysis != null}">
         <h3>종합평가</h3>
         <p th:text="${aiAnalysis.overallSummary}"></p>
         <h3>주요 강점</h3>

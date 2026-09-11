@@ -1,6 +1,5 @@
 package officeflow.survey;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -32,17 +31,8 @@ public class SurveyWorkspaceService {
 	}
 
 	private WorkspaceAnalysis create(ExcelParserService.ExcelPreview preview, List<SurveyColumnProfile> profiles, List<QuestionMappingDto> mappings) {
-		List<List<String>> sanitizedRows = new ArrayList<>();
-		for (List<String> row : preview.allDataRows()) {
-			List<String> sanitized = new ArrayList<>();
-			for (int column = 0; column < preview.headers().size(); column++) {
-				QuestionMappingDto mapping = mappings.get(column);
-				sanitized.add(mapping.role() == QuestionRole.IDENTIFIER || mapping.role() == QuestionRole.METADATA || mapping.role() == QuestionRole.EXCLUDED
-						? "" : column < row.size() ? row.get(column) : "");
-			}
-			sanitizedRows.add(List.copyOf(sanitized));
-		}
-		SurveyAnalysisWorkspace workspace = new SurveyAnalysisWorkspace(List.copyOf(preview.headers()), List.copyOf(sanitizedRows), List.copyOf(profiles), List.copyOf(mappings), preview.allDataRows().size());
+		SurveyAnalysisWorkspace workspace = new SurveyAnalysisWorkspace(preview.headers(), preview.allDataRows(),
+				profiles, mappings, preview.allDataRows().size());
 		return new WorkspaceAnalysis(workspace, analysisService.analyze(workspace));
 	}
 
