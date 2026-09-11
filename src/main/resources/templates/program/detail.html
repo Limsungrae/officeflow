@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>프로그램 상세 | OfficeFlow</title>
+    <style>
+        body{font-family:"Pretendard","Noto Sans KR",Arial,sans-serif;margin:0;background:#f5f7fb;color:#1f2937}.wrap{max-width:820px;margin:48px auto;padding:0 24px}.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:28px;box-shadow:0 6px 20px rgba(15,23,42,.04)}
+        h1{margin:0}.badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eaf2f8;color:#1f4e78;font-size:12px;font-weight:700;margin-top:10px}.grid{display:grid;grid-template-columns:160px 1fr;margin-top:26px;border-top:1px solid #eef2f7}.label,.value{padding:14px 0;border-bottom:1px solid #eef2f7}.label{font-weight:700;color:#64748b}.actions{display:flex;justify-content:space-between;align-items:center;margin-top:26px}.right{display:flex;gap:10px}.btn{padding:10px 15px;border-radius:9px;text-decoration:none;border:0;font-weight:700;cursor:pointer}.primary{background:#1f4e78;color:#fff}.secondary{background:#fff;color:#334155;border:1px solid #cbd5e1}.danger{background:#fff;color:#b91c1c;border:1px solid #fecaca}
+    </style>
+</head>
+<body>
+<div class="wrap"><div class="card">
+    <h1 th:text="${program.title}">프로그램명</h1>
+    <span class="badge" th:text="${program.status.label()}">상태</span>
+    <div class="grid">
+        <div class="label">운영기간</div><div class="value" th:text="|${program.startDate} ~ ${program.endDate}|">기간</div>
+        <div class="label">대상</div><div class="value" th:text="${program.targetGroup ?: '-'}">대상</div>
+        <div class="label">정원</div><div class="value" th:text="${program.capacity == null ? '-' : program.capacity + '명'}">정원</div>
+        <div class="label">담당자</div><div class="value" th:text="${program.manager ?: '-'}">담당자</div>
+        <div class="label">등록일시</div><div class="value" th:text="${#temporals.format(program.createdAt, 'yyyy-MM-dd HH:mm')}">등록일</div>
+    </div>
+    <div class="actions">
+        <a class="btn secondary" href="/programs">목록</a>
+        <div class="right">
+            <a class="btn primary" th:href="@{/programs/{id}/edit(id=${program.id})}">수정</a>
+            <form th:action="@{/programs/{id}/delete(id=${program.id})}" method="post" onsubmit="return confirm('이 프로그램을 삭제하시겠습니까?');"><button class="btn danger" type="submit">삭제</button></form>
+        </div>
+    </div>
+</div></div>
+</body>
+</html>

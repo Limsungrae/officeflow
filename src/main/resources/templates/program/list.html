@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>프로그램 관리 | OfficeFlow</title>
+    <style>
+        body{font-family:"Pretendard","Noto Sans KR",Arial,sans-serif;margin:0;background:#f5f7fb;color:#1f2937}
+        .wrap{max-width:1100px;margin:48px auto;padding:0 24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+        h1{margin:0;font-size:30px}.sub{color:#6b7280;margin-top:8px}.actions{display:flex;gap:10px}.btn{display:inline-block;padding:11px 16px;border-radius:10px;text-decoration:none;border:0;cursor:pointer;font-weight:700}
+        .primary{background:#1f4e78;color:white}.secondary{background:white;color:#1f4e78;border:1px solid #cbd5e1}
+        .card{background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;box-shadow:0 6px 20px rgba(15,23,42,.04)}
+        table{width:100%;border-collapse:collapse}th,td{padding:15px 18px;text-align:left;border-bottom:1px solid #eef2f7}th{background:#f8fafc;font-size:13px;color:#64748b}
+        tr:last-child td{border-bottom:0}a.title{font-weight:700;color:#1f4e78;text-decoration:none}.empty{padding:60px;text-align:center;color:#64748b}
+        .badge{display:inline-block;padding:5px 9px;border-radius:999px;background:#eaf2f8;color:#1f4e78;font-size:12px;font-weight:700}
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="top">
+        <div><h1>프로그램 관리</h1><div class="sub">도서관 프로그램을 등록하고 설문 분석 이력을 연결하기 위한 기준 정보입니다.</div></div>
+        <div class="actions"><a class="btn secondary" href="/excel">설문 분석</a><a class="btn primary" href="/programs/new">+ 프로그램 등록</a></div>
+    </div>
+    <div class="card">
+        <div class="empty" th:if="${#lists.isEmpty(programs)}">등록된 프로그램이 없습니다. 첫 프로그램을 등록해보세요.</div>
+        <table th:unless="${#lists.isEmpty(programs)}">
+            <thead><tr><th>프로그램명</th><th>기간</th><th>대상</th><th>정원</th><th>담당자</th><th>상태</th></tr></thead>
+            <tbody>
+            <tr th:each="program : ${programs}">
+                <td><a class="title" th:href="@{/programs/{id}(id=${program.id})}" th:text="${program.title}">프로그램명</a></td>
+                <td th:text="|${program.startDate} ~ ${program.endDate}|">기간</td>
+                <td th:text="${program.targetGroup ?: '-'}">대상</td>
+                <td th:text="${program.capacity == null ? '-' : program.capacity + '명'}">정원</td>
+                <td th:text="${program.manager ?: '-'}">담당자</td>
+                <td><span class="badge" th:text="${program.status.label()}">상태</span></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+</body>
+</html>
