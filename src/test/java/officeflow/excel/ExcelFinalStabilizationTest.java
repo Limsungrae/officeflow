@@ -45,18 +45,26 @@ class ExcelFinalStabilizationTest {
 	}
 
 	@Test
-	void malformedUploadReturnsExcelScreenErrorAndClearsAnalysisSession() {
+	void malformedUploadShowsFriendlyErrorWithoutDestroyingPreviousAnalysis() throws Exception {
 		var session = new MockHttpSession();
+		controller.upload(new MockMultipartFile("file", "survey.xlsx",
+				"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", workbook(true)),
+				new ExtendedModelMap(), session);
+		var before = (ExcelAnalysisSessionData) session.getAttribute(ExcelAnalysisSessionData.class.getName());
+		assertThat(before).isNotNull();
+
 		var model = new ExtendedModelMap();
-		var file = new MockMultipartFile("file", "broken.xlsx",
+		var broken = new MockMultipartFile("file", "broken.xlsx",
 				"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 				"broken".getBytes(StandardCharsets.UTF_8));
 
-		String view = controller.upload(file, model, session);
+		String view = controller.upload(broken, model, session);
+		var after = (ExcelAnalysisSessionData) session.getAttribute(ExcelAnalysisSessionData.class.getName());
 
 		assertThat(view).isEqualTo("excel");
 		assertThat(model.get("error")).isEqualTo("올바른 .xlsx 파일을 업로드해주세요.");
-		assertThat(session.getAttribute(ExcelAnalysisSessionData.class.getName())).isNull();
+		assertThat(after).isSameAs(before);
+		assertThat(model.get("workspace")).isSameAs(before.surveyWorkspace());
 	}
 
 	@Test
