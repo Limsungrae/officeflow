@@ -1,60 +1,35 @@
 # OfficeFlow
 
-OfficeFlow는 **Excel 설문 응답 파일을 업로드해 문항을 자동 분류하고, 통계·AI 해석·Excel 결과보고서를 생성하는 Spring Boot 기반 설문 분석 웹 애플리케이션**입니다.
+OfficeFlow는 **도서관 프로그램 관리와 Excel 설문 분석을 하나의 Spring Boot 애플리케이션에서 처리하는 업무지원 시스템**입니다.
 
-공공기관·도서관 실무에서 자주 발생하는 만족도 조사 결과 정리 업무를 줄이는 것을 목표로 만들었습니다.
+기존에는 Excel 설문 응답 업로드 → 자동 문항 판정 → 통계 → Gemini 분석 → 7개 시트 결과보고서 생성까지 지원했고, 현재는 **H2 + Spring Data JPA 기반 프로그램 관리 기능**을 추가해 도서관 프로그램 성과관리 플랫폼으로 확장하고 있습니다.
 
 ## 주요 기능
 
+### 설문 분석
 - `.xlsx` 설문 응답 업로드
-- 설문 문항 자동 판정
-  - 응답자 특성
-  - 단일응답
-  - 복수응답
-  - 척도/점수
-  - 추천 의향
-  - 자유서술형
-  - 개인정보/메타데이터 제외
-- 자동 판정 결과 수동 매핑 수정
+- 응답자 특성 / 단일응답 / 복수응답 / 척도 / 점수 / 추천 / 자유서술형 자동 판정
+- 개인정보·메타데이터 자동 제외
+- 수동 문항 매핑 수정
 - 최종 매핑 기준 통계 재계산
-- 자유의견 최대 100건 샘플 기반 AI 분석
-- Gemini 기반 설문 총평 생성
+- Gemini 기반 AI 총평
+- 자유의견 최대 100건 샘플 기반 AI 입력
 - 7개 시트 Excel 결과보고서 다운로드
-- 세션 기반 분석 상태 유지
-- 잘못된 매핑·손상된 Excel 입력에 대한 방어 처리
+- 세션 기반 현재 분석 상태 유지
+- 손상된 Excel, 잘못된 매핑 요청 방어
 
-## 핵심 데이터 흐름
-
-```text
-.xlsx 업로드
-    ↓
-원본 응답 보존 (originalRows)
-    ↓
-문항 프로파일링 / 자동 매핑
-    ↓
-최종 Question Mapping
-    ↓
-┌──────────────┬──────────────┬──────────────┐
-통계 분석       설문 유형별 분석   AI 입력 / 보고서
-└──────────────┴──────────────┴──────────────┘
-```
-
-원본 응답은 재매핑 과정에서도 변경하지 않으며, **최종 문항 매핑을 모든 파생 분석의 기준으로 사용**합니다.
-
-## 안정화된 주요 동작
-
-- 자동 제외된 문항을 다시 포함해도 원본 응답 복원
-- 매핑 변경 시 기존 AI 결과 무효화
-- 오래된 AI 응답이 새 매핑 상태를 덮어쓰지 않도록 차단
-- GET / 재매핑 / AI 성공·실패 후 화면 상태 복원
-- `SINGLE / RESPONDENT_ATTRIBUTE` 역할 보존
-- 자유의견을 고유값 비율만으로 식별자로 오판하지 않도록 개선
-- 5점 척도는 `1~5 정수`만 유효값으로 사용
-- 별도 `SCORE` 문항은 각 매핑의 범위를 유지
-- 자유의견 전체 응답 수와 최대 100건 샘플을 분리
-- 잘못된 매핑 유형 제출 시 500 오류 대신 사용자 오류 메시지 반환
-- 손상된 `.xlsx`, 헤더만 있고 응답이 없는 파일 거부
-- 실패한 업로드/매핑 요청은 기존 정상 분석 세션을 훼손하지 않음
+### 프로그램 관리
+- 도서관 프로그램 등록
+- 프로그램 목록 조회
+- 프로그램 상세 조회
+- 프로그램 수정
+- 프로그램 삭제
+- 프로그램 상태 관리
+  - 예정
+  - 진행중
+  - 완료
+  - 취소
+- H2 파일 DB 영구 저장
 
 ## 기술 스택
 
@@ -62,36 +37,69 @@ OfficeFlow는 **Excel 설문 응답 파일을 업로드해 문항을 자동 분�
 - Spring Boot 4.1.1
 - Spring MVC
 - Thymeleaf
+- Spring Data JPA
+- Hibernate
+- H2 Database
 - Apache POI 5.4.1
 - Jackson
 - Gemini API
 - Gradle 9.x Wrapper
 - JUnit 5 / AssertJ
 
-현재 버전은 별도 DB 없이 `HttpSession`을 사용해 분석 상태를 관리합니다.
+Spring Boot 4.1.1에서는 `spring-boot-starter-data-jpa`를 통해 Hibernate와 Spring Data JPA를 사용합니다.
+
+## 핵심 구조
+
+```text
+Program 관리
+    ↓
+Controller
+    ↓
+Service
+    ↓
+JpaRepository
+    ↓
+H2 file database
+
+Excel 설문 분석
+    ↓
+원본 응답 보존 (originalRows)
+    ↓
+문항 자동 매핑 / 사용자 최종 매핑
+    ↓
+통계 / 유형별 분석 / AI 입력 / Excel 보고서
+```
+
+현재 프로그램 데이터는 DB에 영구 저장되며, 설문 분석 결과는 아직 세션에 유지됩니다.
+다음 확장 단계에서 **Program ↔ SurveyAnalysis 이력 연결**을 추가할 예정입니다.
 
 ## 프로젝트 구조
 
 ```text
 src/main/java/officeflow
-├─ ai/       # Gemini 연동, AI 입력/결과 DTO
-├─ excel/    # 업로드, 파싱, 기존 통계, 컨트롤러
-├─ report/   # Excel 결과보고서 생성
-└─ survey/   # 문항 프로파일링, 매핑, 유형별 설문 분석
+├─ ai/        # Gemini 연동, AI 입력/결과 DTO
+├─ excel/     # Excel 업로드, 파싱, 통계, 화면 컨트롤러
+├─ program/   # 프로그램 Entity / Repository / Service / Controller
+├─ report/    # Excel 결과보고서 생성
+└─ survey/    # 문항 프로파일링, 매핑, 유형별 설문 분석
 
 src/main/resources
 ├─ templates/excel.html
+├─ templates/program/
+│  ├─ list.html
+│  ├─ form.html
+│  └─ detail.html
 └─ application.properties
 ```
 
 ## 실행 방법
 
-### 1. 요구사항
+### 요구사항
 
 - JDK 21
 - 별도 DB 설치 불필요
 
-### 2. 실행
+### 실행
 
 Linux / macOS / Codespaces:
 
@@ -105,15 +113,75 @@ Windows:
 gradlew.bat bootRun
 ```
 
-브라우저에서 다음 주소로 접속합니다.
+설문 분석:
 
 ```text
 http://localhost:8080/excel
 ```
 
+프로그램 관리:
+
+```text
+http://localhost:8080/programs
+```
+
+## H2 + JPA
+
+기본 DB 설정:
+
+```properties
+spring.datasource.url=jdbc:h2:file:./data/officeflow;AUTO_SERVER=TRUE
+spring.datasource.username=sa
+spring.datasource.password=
+spring.jpa.hibernate.ddl-auto=update
+```
+
+DB 파일은 프로젝트의 `data/` 디렉터리에 생성되며 Git에는 커밋되지 않습니다.
+
+개발 중 H2 Console은 다음 주소를 사용합니다.
+
+```text
+http://localhost:8080/h2-console
+```
+
+JDBC URL:
+
+```text
+jdbc:h2:file:./data/officeflow;AUTO_SERVER=TRUE
+```
+
+사용자명:
+
+```text
+sa
+```
+
+비밀번호는 기본값이 비어 있습니다.
+
+> H2 Console은 개발 편의를 위한 기능이며 `spring-boot-h2console`을 developmentOnly 의존성으로 사용합니다.
+
+## Program 도메인
+
+현재 프로그램 엔티티의 주요 필드:
+
+```text
+Program
+- id
+- title
+- startDate
+- endDate
+- targetGroup
+- capacity
+- manager
+- status
+- createdAt
+```
+
+종료일이 시작일보다 빠른 프로그램은 저장하지 않습니다.
+
 ## Gemini 설정
 
-AI 분석을 사용하려면 환경변수에 API Key를 설정합니다.
+AI 분석을 사용하려면 환경변수를 설정합니다.
 
 Linux / macOS / Codespaces:
 
@@ -126,17 +194,17 @@ Windows PowerShell:
 
 ```powershell
 $env:GEMINI_API_KEY="your-api-key"
-./gradlew bootRun
+gradlew.bat bootRun
 ```
 
-선택적으로 다음 환경변수도 변경할 수 있습니다.
+선택 환경변수:
 
 ```text
 GEMINI_MODEL
 GEMINI_ENDPOINT
 ```
 
-AI 기능을 사용하지 않는 경우에도 Excel 업로드, 문항 분석, 통계 및 보고서 기능은 사용할 수 있습니다.
+AI 기능을 사용하지 않아도 프로그램 관리, Excel 업로드, 통계, 보고서 생성은 사용할 수 있습니다.
 
 ## 테스트
 
@@ -152,51 +220,26 @@ AI 기능을 사용하지 않는 경우에도 Excel 업로드, 문항 분석, �
 ./gradlew bootJar
 ```
 
-생성 JAR:
+Program 영구저장 테스트는 별도의 메모리 H2 DB를 사용해 실제 저장·조회·수정·삭제와 기간 검증을 확인합니다.
 
-```text
-build/libs/officeflow-0.0.1-SNAPSHOT.jar
-```
+## 안정화된 설문 분석 동작
 
-실행:
+- `originalRows` 불변 보존
+- 자동 제외 문항 재포함 시 원본 응답 복원
+- 최종 매핑을 모든 파생 분석의 기준으로 사용
+- 매핑 변경 시 기존 AI 결과 무효화
+- 오래된 AI 응답 저장 차단
+- GET / 재매핑 / AI 성공·실패 후 화면 상태 복원
+- `SINGLE / RESPONDENT_ATTRIBUTE` 역할 보존
+- 고유 자유의견을 식별자로 오판하지 않도록 개선
+- 5점 척도는 `1~5 정수`만 유효
+- SCORE 문항은 각 매핑의 범위 유지
+- 자유의견 전체 응답 수와 최대 100건 샘플 분리
+- 잘못된 매핑 유형은 500 대신 사용자 오류 메시지 표시
+- 손상된 `.xlsx`와 응답 없는 Excel 거부
+- 실패한 요청은 기존 정상 분석 세션을 훼손하지 않음
 
-```bash
-java -jar build/libs/officeflow-0.0.1-SNAPSHOT.jar
-```
-
-## Excel 입력 규칙
-
-- `.xlsx` 형식만 지원
-- 첫 번째 시트를 분석
-- 첫 번째 유효 행을 헤더로 사용
-- 헤더가 없거나 응답 데이터가 없는 파일은 분석하지 않음
-- 손상된 `.xlsx` 파일은 사용자 오류 메시지로 처리
-
-### 5점 척도
-
-`SCALE` 및 기존 만족도 통계는 `1, 2, 3, 4, 5` 정수만 정상 응답으로 처리합니다.
-
-예:
-
-```text
-4, 4, 4, 4, 99
-→ 유효응답 4
-→ 평균 4.0
-```
-
-### 자유의견
-
-전체 응답 수는 원본 데이터 전체를 기준으로 계산하고, 화면/AI 전달용 의견 샘플만 최대 100건으로 제한합니다.
-
-```text
-자유의견 101건
-→ 유효응답 101
-→ AI/표시 샘플 100
-```
-
-## 결과보고서
-
-다운로드되는 Excel 보고서는 7개 시트로 구성됩니다.
+## Excel 결과보고서
 
 1. 조사개요
 2. 결과요약
@@ -208,22 +251,15 @@ java -jar build/libs/officeflow-0.0.1-SNAPSHOT.jar
 
 ## 개인정보 주의
 
-OfficeFlow는 이름, 연락처, 이메일 등 명백한 식별 가능 컬럼을 자동 분석 대상에서 제외하도록 설계되어 있습니다.
+OfficeFlow는 이름, 연락처, 이메일 등 명백한 식별 컬럼을 자동 분석 대상에서 제외합니다.
 
-다만 규칙 기반 자동 판정은 모든 형태의 개인정보를 완벽하게 식별할 수 없으므로, **외부 AI API를 사용하는 실제 업무 환경에서는 AI 분석 실행 전에 문항 매핑과 전송 데이터를 반드시 확인해야 합니다.**
+다만 규칙 기반 자동 판정은 모든 개인정보를 완벽히 식별할 수 없으므로 실제 공공기관 업무에서 외부 AI API를 사용할 때는 **최종 문항 매핑과 외부 전송 데이터를 반드시 확인해야 합니다.** 조직의 개인정보 처리 기준과 내부 보안 정책을 우선 적용해야 합니다.
 
-실제 개인정보가 포함된 설문을 외부 AI 서비스로 전송할 경우 조직의 개인정보 처리 기준과 내부 보안 정책을 우선 적용해야 합니다.
+## 다음 확장 단계
 
-## 현재 범위
-
-현재 버전은 단일 Spring Boot 애플리케이션 기반의 설문 분석 프로토타입/업무지원 도구입니다.
-
-아직 포함하지 않은 기능:
-
-- DB 영구 저장
-- 사용자 로그인 / 권한 관리
-- 다중 사용자 협업
-- 설문 프로젝트 이력 관리
-- 운영 환경용 감사 로그
-
-이 기능들은 핵심 분석 흐름 안정화 이후 확장 대상으로 두고 있습니다.
+1. 프로그램별 설문 분석 이력 저장
+2. Program ↔ SurveyAnalysis 관계 연결
+3. 프로그램 상세 화면에서 과거 분석 결과 조회
+4. 프로그램별 성과 대시보드
+5. 사용자/권한 관리
+6. 감사 로그 및 운영 설정
