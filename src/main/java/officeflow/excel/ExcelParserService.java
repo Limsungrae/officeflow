@@ -23,7 +23,7 @@ public class ExcelParserService {
 	public ExcelPreview parse(MultipartFile file) throws IOException {
 		validate(file);
 
-		try (InputStream inputStream = file.getInputStream(); Workbook workbook = new XSSFWorkbook(inputStream)) {
+		try (InputStream inputStream = file.getInputStream(); Workbook workbook = openWorkbook(inputStream)) {
 			if (workbook.getNumberOfSheets() == 0) {
 				throw new IllegalArgumentException("엑셀 파일에 시트가 없습니다.");
 			}
@@ -38,8 +38,11 @@ public class ExcelParserService {
 			DataFormatter formatter = new DataFormatter();
 			FormulaEvaluator evaluator = workbook.getCreationHelper().createFormulaEvaluator();
 			List<String> headers = readRow(headerRow, columnCount, formatter, evaluator);
-			List<List<String>> dataRows = new ArrayList<>();
+			if (headers.stream().allMatch(String::isBlank)) {
+				throw new IllegalArgumentException("첫 행에 컬럼명이 없습니다.");
+			}
 
+			List<List<String>> dataRows = new ArrayList<>();
 			int firstDataRow = headerRow.getRowNum() + 1;
 			for (int rowIndex = firstDataRow; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
 				Row row = sheet.getRow(rowIndex);
@@ -48,8 +51,20 @@ public class ExcelParserService {
 				}
 			}
 
+			if (dataRows.isEmpty()) {
+				throw new IllegalArgumentException("분석할 응답 데이터가 없습니다.");
+			}
+
 			List<List<String>> previewRows = dataRows.stream().limit(MAX_PREVIEW_ROWS).toList();
 			return new ExcelPreview(headers, previewRows, dataRows);
+		}
+	}
+
+	private Workbook openWorkbook(InputStream inputStream) {
+		try {
+			return new XSSFWorkbook(inputStream);
+		} catch (IOException | RuntimeException exception) {
+			throw new IllegalArgumentException("올바른 .xlsx 파일을 업로드해주세요.", exception);
 		}
 	}
 
