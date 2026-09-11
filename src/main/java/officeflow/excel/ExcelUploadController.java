@@ -120,7 +120,17 @@ public class ExcelUploadController {
 		List<QuestionMappingDto> mappings = new java.util.ArrayList<>();
 		for (QuestionMappingDto mapping : current.surveyWorkspace().mappings()) {
 			String selected = parameters.get("mappingType_" + mapping.columnIndex());
-			mappings.add(selected == null ? mapping : mapping.withType(QuestionType.valueOf(selected)));
+			if (selected == null) {
+				mappings.add(mapping);
+				continue;
+			}
+			QuestionType selectedType = parseQuestionType(selected);
+			if (selectedType == null) {
+				model.addAttribute("error", "유효하지 않은 문항 유형이 포함되어 있습니다.");
+				populateModelFromSession(model, session);
+				return "excel";
+			}
+			mappings.add(mapping.withType(selectedType));
 		}
 		var preview = new ExcelParserService.ExcelPreview(current.surveyWorkspace().headers(),
 				List.of(), current.surveyWorkspace().originalRows());
@@ -170,6 +180,17 @@ public class ExcelUploadController {
 
 	private ExcelAnalysisSessionData getSessionData(HttpSession session) {
 		return (ExcelAnalysisSessionData) session.getAttribute(ANALYSIS_SESSION_KEY);
+	}
+
+	private QuestionType parseQuestionType(String value) {
+		if (value == null || value.isBlank()) {
+			return null;
+		}
+		try {
+			return QuestionType.valueOf(value.trim());
+		} catch (IllegalArgumentException exception) {
+			return null;
+		}
 	}
 
 	private void populateModelFromSession(Model model, HttpSession session) {
